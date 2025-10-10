@@ -97,6 +97,34 @@ create_vm() {
   qm set ${VMID} --ide2 ${STORAGE_NAME}:cloudinit
 }
 
+# Function to create a WAN VM with NAT configuration
+create_wan_vm() {
+  VMID=$1
+  VMNAME=$2
+  CORES=$3
+  MEMORY=$4
+  DISK_SIZE=$5
+  SNIPPET=$6
+
+  echo "--- Creating WAN VM ${VMID} (${VMNAME}) ---"
+
+  # Create the VM from the template
+  qm clone ${TEMPLATE_VMID} ${VMID} --name ${VMNAME} --full
+
+  # Configure hardware
+  qm resize ${VMID} scsi0 ${DISK_SIZE}
+  qm set ${VMID} --cores ${CORES} --memory ${MEMORY}
+
+  # Configure Cloud-Init with user settings first
+  qm set ${VMID} --ciuser user --cipassword user
+  qm set ${VMID} --sshkeys <(echo "${SSH_PUBLIC_KEY}")
+  qm set ${VMID} --ide2 ${STORAGE_NAME}:cloudinit
+  
+  # Then apply the custom snippet (vendor data to preserve user config)
+  qm set ${VMID} --cicustom "vendor=local:snippets/${SNIPPET}"
+}
+
+
 # --- Main Execution ---
 
 # 1. Setup the template
@@ -112,7 +140,9 @@ SNIPPET_PATH="${SNIPPET_DIR}/${SNIPPET_FILE}"
 
 cat <<'EOF' > ${SNIPPET_PATH}
 #cloud-config
-# This script enables IP forwarding and NAT to turn the VM into a gateway.
+# Vendor cloud-init for NAT configuration
+# This preserves the user configuration from the main cloud-init
+
 package_update: true
 package_upgrade: true
 packages:
@@ -231,18 +261,16 @@ COMMON_MEMORY=2048
 COMMON_DISK="16G"
 
 # VM 1000: wan0
-create_vm 1000 "wan0" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
+create_wan_vm 1000 "wan0" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK} ${SNIPPET_FILE}
 qm set 1000 --net0 virtio,bridge=vmbr00 --ipconfig0 ip=dhcp
 qm set 1000 --net1 virtio,bridge=vmbr10 --ipconfig1 ip=172.0.10.1/24
 qm set 1000 --nameserver "1.1.1.1 1.0.0.1"
-qm set 1000 --cicustom "user=local:snippets/${SNIPPET_FILE}"
 
 # VM 1001: wan1
-create_vm 1001 "wan1" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
+create_wan_vm 1001 "wan1" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK} ${SNIPPET_FILE}
 qm set 1001 --net0 virtio,bridge=vmbr01 --ipconfig0 ip=dhcp
 qm set 1001 --net1 virtio,bridge=vmbr11 --ipconfig1 ip=172.0.11.1/24
 qm set 1001 --nameserver "1.1.1.1 1.0.0.1"
-qm set 1001 --cicustom "user=local:snippets/${SNIPPET_FILE}"
 
 # VM 1003: lan0
 create_vm 1003 "lan0" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
