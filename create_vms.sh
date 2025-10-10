@@ -138,14 +138,14 @@ create_vm 1000 "wan0" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
 qm set 1000 --net0 virtio,bridge=vmbr00 --ipconfig0 ip=dhcp
 qm set 1000 --net1 virtio,bridge=vmbr10 --ipconfig1 ip=172.0.10.1/24
 qm set 1000 --nameserver "1.1.1.1 1.0.0.1"
-qm set 1000 --cicustom user=local:snippets/wan-passthrough.yaml
+qm set 1000 --cicustom user=${SNIPPET_PATH}
 
 # VM 1001: wan1
 create_vm 1001 "wan1" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
 qm set 1001 --net0 virtio,bridge=vmbr01 --ipconfig0 ip=dhcp
 qm set 1001 --net1 virtio,bridge=vmbr11 --ipconfig1 ip=172.0.11.1/24
 qm set 1001 --nameserver "1.1.1.1 1.0.0.1"
-qm set 1001 --cicustom user=local:snippets/wan-passthrough.yaml
+qm set 1001 --cicustom user=${SNIPPET_PATH}
 
 # VM 1003: lan0
 create_vm 1003 "lan0" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
