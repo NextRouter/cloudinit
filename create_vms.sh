@@ -105,22 +105,63 @@ setup_template
 # Create cloud-init snippet for WAN passthrough
 # This enables IP forwarding and NAT
 echo "--- Creating cloud-init snippet for WAN VMs ---"
-SNIPPET_PATH="/var/lib/vz/snippets/wan-passthrough.yaml"
+SNIPPET_DIR="/var/lib/vz/snippets"
+mkdir -p ${SNIPPET_DIR}
+SNIPPET_FILE="wan-passthrough.yaml"
+SNIPPET_PATH="${SNIPPET_DIR}/${SNIPPET_FILE}"
+
 cat <<'EOF' > ${SNIPPET_PATH}
 #cloud-config
 # This script enables IP forwarding and NAT to turn the VM into a gateway.
 package_update: true
+package_upgrade: true
 packages:
+  - iptables
   - iptables-persistent
+  - netfilter-persistent
+
+write_files:
+  - path: /etc/sysctl.d/99-ip-forward.conf
+    content: |
+      net.ipv4.ip_forward=1
+      net.ipv4.conf.all.forwarding=1
+    permissions: '0644'
+  - path: /etc/rc.local
+    content: |
+      #!/bin/bash
+      # Enable IP forwarding
+      sysctl -w net.ipv4.ip_forward=1
+      sysctl -w net.ipv4.conf.all.forwarding=1
+      # Setup NAT
+      iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+      iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
+      iptables -A FORWARD -i eth0 -o eth1 -m state --state RELATED,ESTABLISHED -j ACCEPT
+      # Save rules
+      netfilter-persistent save
+      exit 0
+    permissions: '0755'
+
 runcmd:
-  # Enable IP forwarding
-  - 'sed -i -e "/^#net.ipv4.ip_forward=1/s/^#//" /etc/sysctl.conf'
-  - 'sysctl -p'
-  # Add NAT rule
-  - 'iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE'
-  # Save iptables rules to make them persistent
-  - 'sh -c "iptables-save > /etc/iptables/rules.v4"'
+  # Enable IP forwarding immediately
+  - sysctl -w net.ipv4.ip_forward=1
+  - sysctl -w net.ipv4.conf.all.forwarding=1
+  - sysctl -p /etc/sysctl.d/99-ip-forward.conf
+  # Configure NAT rules
+  - iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+  - iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
+  - iptables -A FORWARD -i eth0 -o eth1 -m state --state RELATED,ESTABLISHED -j ACCEPT
+  # Save iptables rules
+  - netfilter-persistent save
+  # Enable rc.local service
+  - systemctl enable rc-local
+  - chmod +x /etc/rc.local
+
+power_state:
+  mode: reboot
+  timeout: 300
+  condition: true
 EOF
+
 echo "Snippet created at ${SNIPPET_PATH}"
 
 # 2. Create VMs
@@ -138,14 +179,14 @@ create_vm 1000 "wan0" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
 qm set 1000 --net0 virtio,bridge=vmbr00 --ipconfig0 ip=dhcp
 qm set 1000 --net1 virtio,bridge=vmbr10 --ipconfig1 ip=172.0.10.1/24
 qm set 1000 --nameserver "1.1.1.1 1.0.0.1"
-qm set 1000 --cicustom user=${SNIPPET_PATH}
+qm set 1000 --cicustom "user=local:snippets/${SNIPPET_FILE}"
 
 # VM 1001: wan1
 create_vm 1001 "wan1" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
 qm set 1001 --net0 virtio,bridge=vmbr01 --ipconfig0 ip=dhcp
 qm set 1001 --net1 virtio,bridge=vmbr11 --ipconfig1 ip=172.0.11.1/24
 qm set 1001 --nameserver "1.1.1.1 1.0.0.1"
-qm set 1001 --cicustom user=${SNIPPET_PATH}
+qm set 1001 --cicustom "user=local:snippets/${SNIPPET_FILE}"
 
 # VM 1003: lan0
 create_vm 1003 "lan0" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
@@ -173,7 +214,16 @@ qm set 1002 --nameserver "1.1.1.1 1.0.0.1"
 echo "--- All VMs created ---"
 echo "NOTE: This script does not start the VMs. You can start them from the Proxmox UI."
 echo "IMPORTANT: Review the generated commands and ensure they match your Proxmox environment."
+echo ""
+echo "=== WAN VM Configuration ==="
+echo "wan0 and wan1 are configured as NAT gateways:"
+echo "  - net0 (eth0): WAN interface with DHCP (connects to external network)"
+echo "  - net1 (eth1): LAN interface (connects to router VM)"
+echo "  - IP forwarding and NAT are enabled automatically via cloud-init"
+echo "  - VMs will reboot after initial setup to apply all settings"
+echo ""
 
+read -p "Do you want to start all created VMs now? (y/N) " -n 1 -r
 echo
 if [[ $REPLY =~ ^[Yy]$ ]]
 then
