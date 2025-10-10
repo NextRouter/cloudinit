@@ -102,6 +102,27 @@ create_vm() {
 # 1. Setup the template
 setup_template
 
+# Create cloud-init snippet for WAN passthrough
+# This enables IP forwarding and NAT
+echo "--- Creating cloud-init snippet for WAN VMs ---"
+SNIPPET_PATH="/var/lib/vz/snippets/wan-passthrough.yaml"
+cat <<'EOF' > ${SNIPPET_PATH}
+#cloud-config
+# This script enables IP forwarding and NAT to turn the VM into a gateway.
+package_update: true
+packages:
+  - iptables-persistent
+runcmd:
+  # Enable IP forwarding
+  - 'sed -i -e "/^#net.ipv4.ip_forward=1/s/^#//" /etc/sysctl.conf'
+  - 'sysctl -p'
+  # Add NAT rule
+  - 'iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE'
+  # Save iptables rules to make them persistent
+  - 'sh -c "iptables-save > /etc/iptables/rules.v4"'
+EOF
+echo "Snippet created at ${SNIPPET_PATH}"
+
 # 2. Create VMs
 echo "--- Starting VM Creation ---"
 
@@ -117,12 +138,14 @@ create_vm 1000 "wan0" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
 qm set 1000 --net0 virtio,bridge=vmbr00 --ipconfig0 ip=dhcp
 qm set 1000 --net1 virtio,bridge=vmbr10 --ipconfig1 ip=172.0.10.1/24
 qm set 1000 --nameserver "1.1.1.1 1.0.0.1"
+qm set 1000 --cicustom user=local:snippets/wan-passthrough.yaml
 
 # VM 1001: wan1
 create_vm 1001 "wan1" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
 qm set 1001 --net0 virtio,bridge=vmbr01 --ipconfig0 ip=dhcp
 qm set 1001 --net1 virtio,bridge=vmbr11 --ipconfig1 ip=172.0.11.1/24
 qm set 1001 --nameserver "1.1.1.1 1.0.0.1"
+qm set 1001 --cicustom user=local:snippets/wan-passthrough.yaml
 
 # VM 1003: lan0
 create_vm 1003 "lan0" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
@@ -141,8 +164,8 @@ qm set 1005 --net0 virtio,bridge=vmbr03 --ipconfig0 ip=dhcp
 
 # VM 1002
 create_vm 1002 "router" 8 8192 "32G"
-qm set 1002 --net0 virtio,bridge=vmbr10 --ipconfig0 ip=172.0.10.10/24
-qm set 1002 --net1 virtio,bridge=vmbr11 --ipconfig1 ip=172.0.11.10/24
+qm set 1002 --net0 virtio,bridge=vmbr10 --ipconfig0 ip=172.0.10.10/24,gw=172.0.10.1
+qm set 1002 --net1 virtio,bridge=vmbr11 --ipconfig1 ip=172.0.11.10/24,gw=172.0.11.1
 qm set 1002 --net2 virtio,bridge=vmbr12 --ipconfig2 ip=172.0.12.10/24
 qm set 1002 --nameserver "1.1.1.1 1.0.0.1"
 
@@ -150,3 +173,16 @@ qm set 1002 --nameserver "1.1.1.1 1.0.0.1"
 echo "--- All VMs created ---"
 echo "NOTE: This script does not start the VMs. You can start them from the Proxmox UI."
 echo "IMPORTANT: Review the generated commands and ensure they match your Proxmox environment."
+
+echo
+if [[ $REPLY =~ ^[Yy]$ ]]
+then
+  echo "--- Starting all VMs ---"
+  for vmid in 1000 1001 1003 1004 1005 1002; do
+    echo "Starting VM ${vmid}..."
+    qm start "${vmid}"
+  done
+  echo "--- All VMs started ---"
+else
+  echo "VMs were not started."
+fi
