@@ -119,42 +119,98 @@ packages:
   - iptables
   - iptables-persistent
   - netfilter-persistent
+  - net-tools
 
 write_files:
   - path: /etc/sysctl.d/99-ip-forward.conf
     content: |
       net.ipv4.ip_forward=1
       net.ipv4.conf.all.forwarding=1
+      net.ipv4.conf.default.forwarding=1
     permissions: '0644'
-  - path: /etc/rc.local
+  
+  - path: /usr/local/bin/setup-nat.sh
     content: |
       #!/bin/bash
+      # NAT setup script with interface detection
+      
+      # Wait for network interfaces to be ready
+      sleep 10
+      
+      # Detect WAN and LAN interfaces
+      WAN_IF=$(ip route | grep default | awk '{print $5}' | head -n1)
+      if [ -z "$WAN_IF" ]; then
+          # Fallback: find first interface with DHCP IP
+          WAN_IF=$(ip -o -4 addr show | grep -v "127.0.0.1" | head -n1 | awk '{print $2}')
+      fi
+      
+      # LAN interface is the other one
+      ALL_IFS=$(ip -o link show | awk -F': ' '{print $2}' | grep -E '^(eth|ens)' | grep -v "$WAN_IF")
+      LAN_IF=$(echo "$ALL_IFS" | head -n1)
+      
+      echo "WAN Interface: $WAN_IF" | tee -a /var/log/nat-setup.log
+      echo "LAN Interface: $LAN_IF" | tee -a /var/log/nat-setup.log
+      
       # Enable IP forwarding
       sysctl -w net.ipv4.ip_forward=1
       sysctl -w net.ipv4.conf.all.forwarding=1
-      # Setup NAT
-      iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-      iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
-      iptables -A FORWARD -i eth0 -o eth1 -m state --state RELATED,ESTABLISHED -j ACCEPT
+      
+      # Clear existing rules
+      iptables -t nat -F
+      iptables -t nat -X
+      iptables -F FORWARD
+      
+      # Setup NAT rules
+      iptables -t nat -A POSTROUTING -o $WAN_IF -j MASQUERADE
+      iptables -A FORWARD -i $LAN_IF -o $WAN_IF -j ACCEPT
+      iptables -A FORWARD -i $WAN_IF -o $LAN_IF -m state --state RELATED,ESTABLISHED -j ACCEPT
+      
+      # Allow all forwarding (less restrictive, for testing)
+      iptables -P FORWARD ACCEPT
+      
       # Save rules
       netfilter-persistent save
+      
+      # Log iptables status
+      echo "=== IPTables NAT Rules ===" | tee -a /var/log/nat-setup.log
+      iptables -t nat -L -n -v | tee -a /var/log/nat-setup.log
+      echo "=== IPTables FORWARD Rules ===" | tee -a /var/log/nat-setup.log
+      iptables -L FORWARD -n -v | tee -a /var/log/nat-setup.log
+      
       exit 0
     permissions: '0755'
+  
+  - path: /etc/systemd/system/setup-nat.service
+    content: |
+      [Unit]
+      Description=Setup NAT forwarding
+      After=network-online.target
+      Wants=network-online.target
+      
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/local/bin/setup-nat.sh
+      RemainAfterExit=yes
+      
+      [Install]
+      WantedBy=multi-user.target
+    permissions: '0644'
 
 runcmd:
   # Enable IP forwarding immediately
   - sysctl -w net.ipv4.ip_forward=1
   - sysctl -w net.ipv4.conf.all.forwarding=1
   - sysctl -p /etc/sysctl.d/99-ip-forward.conf
-  # Configure NAT rules
-  - iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
-  - iptables -A FORWARD -i eth1 -o eth0 -j ACCEPT
-  - iptables -A FORWARD -i eth0 -o eth1 -m state --state RELATED,ESTABLISHED -j ACCEPT
-  # Save iptables rules
-  - netfilter-persistent save
-  # Enable rc.local service
-  - systemctl enable rc-local
-  - chmod +x /etc/rc.local
+  # Make setup script executable
+  - chmod +x /usr/local/bin/setup-nat.sh
+  # Enable and start the NAT setup service
+  - systemctl daemon-reload
+  - systemctl enable setup-nat.service
+  - systemctl start setup-nat.service
+  # Wait a bit for the service to complete
+  - sleep 15
+  # Log completion
+  - echo "Cloud-init NAT setup completed at $(date)" >> /var/log/nat-setup.log
 
 power_state:
   mode: reboot
