@@ -264,30 +264,30 @@ COMMON_DISK="16G"
 create_wan_vm 1000 "wan0" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK} ${SNIPPET_FILE}
 qm set 1000 --net0 virtio,bridge=vmbr00 --ipconfig0 ip=dhcp
 qm set 1000 --net1 virtio,bridge=vmbr10 --ipconfig1 ip=172.0.10.1/24
-qm set 1000 --net100 virtio,bridge=vmbrvmbr000 --ipconfig1 ip=172.0.0.100/24
+qm set 1000 --net10 virtio,bridge=admin --ipconfig1 ip=172.0.0.100/24
 qm set 1000 --nameserver "1.1.1.1 1.0.0.1"
 
 # VM 1001: wan1
 create_wan_vm 1001 "wan1" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK} ${SNIPPET_FILE}
 qm set 1001 --net0 virtio,bridge=vmbr01 --ipconfig0 ip=dhcp
 qm set 1001 --net1 virtio,bridge=vmbr11 --ipconfig1 ip=172.0.11.1/24
-qm set 1001 --net100 virtio,bridge=vmbrvmbr000 --ipconfig1 ip=172.0.0.101/24
+qm set 1001 --net10 virtio,bridge=admin --ipconfig1 ip=172.0.0.101/24
 qm set 1001 --nameserver "1.1.1.1 1.0.0.1"
 
 # VM 1003: lan0
 create_vm 1003 "lan0" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
 qm set 1003 --net0 virtio,bridge=vmbr12 --ipconfig0 ip=dhcp
-qm set 1003 --net100 virtio,bridge=vmbrvmbr000 --ipconfig1 ip=172.0.0.103/24
+qm set 1003 --net10 virtio,bridge=admin --ipconfig1 ip=172.0.0.103/24
 
 # VM 1004: lan1
 create_vm 1004 "lan1" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
 qm set 1004 --net0 virtio,bridge=vmbr12 --ipconfig0 ip=dhcp
-qm set 1004 --net100 virtio,bridge=vmbrvmbr000 --ipconfig1 ip=172.0.0.104/24
+qm set 1004 --net10 virtio,bridge=admin --ipconfig1 ip=172.0.0.104/24
 
 # VM 1005: lan2
 create_vm 1005 "lan2" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
 qm set 1005 --net0 virtio,bridge=vmbr12 --ipconfig0 ip=dhcp
-qm set 1005 --net100 virtio,bridge=vmbrvmbr000 --ipconfig1 ip=172.0.0.105/24
+qm set 1005 --net10 virtio,bridge=admin --ipconfig1 ip=172.0.0.105/24
 
 
 # --- VM Group 2 (8 CPU, 8GB RAM, 32GB Disk) ---
@@ -297,7 +297,7 @@ create_vm 1002 "router" 8 8192 "32G"
 qm set 1002 --net0 virtio,bridge=vmbr10 --ipconfig0 ip=172.0.10.10/24,gw=172.0.10.1
 qm set 1002 --net1 virtio,bridge=vmbr11 --ipconfig1 ip=172.0.11.10/24
 qm set 1002 --net2 virtio,bridge=vmbr12 --ipconfig2 ip=172.0.12.1/24
-qm set 1002 --net100 virtio,bridge=vmbrvmbr000 --ipconfig1 ip=172.0.0.102/24
+qm set 1002 --net10 virtio,bridge=admin --ipconfig1 ip=172.0.0.102/24
 qm set 1002 --nameserver "1.1.1.1 1.0.0.1"
 
 
