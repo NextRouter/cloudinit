@@ -296,7 +296,7 @@ qm set 1005 --net1 virtio,bridge=admin --ipconfig1 ip=172.0.0.15/24
 create_vm 1002 "router" 8 8192 "32G"
 qm set 1002 --net0 virtio,bridge=vmbr10 --ipconfig0 ip=127.0.10.10/24,gw=127.0.10.1
 qm set 1002 --net1 virtio,bridge=vmbr11 --ipconfig1 ip=127.0.11.10/24,gw=127.0.11.1
-qm set 1002 --net2 virtio,bridge=vmbr12 --ipconfig2 ip=127.0.12.10/24
+qm set 1002 --net2 virtio,bridge=vmbr02 --ipconfig2 ip=127.0.12.10/24
 qm set 1002 --net3 virtio,bridge=admin --ipconfig3 ip=172.0.0.12/24
 qm set 1002 --nameserver "1.1.1.1 1.0.0.1"
 
