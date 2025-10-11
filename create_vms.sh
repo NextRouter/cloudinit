@@ -171,7 +171,7 @@ write_files:
       WAN_IF=$(ip route | grep default | awk '{print $5}' | head -n1)
       if [ -z "$WAN_IF" ]; then
           # Fallback: find first interface with DHCP IP
-          WAN_IF=$(ip -o -4 addr show | grep -v "127.0.0.1" | head -n1 | awk '{print $2}')
+          WAN_IF=$(ip -o -4 addr show | grep -v "172.0.0.1" | head -n1 | awk '{print $2}')
       fi
       
       # LAN interface is the other one
@@ -263,41 +263,41 @@ COMMON_DISK="16G"
 # VM 1000: wan0
 create_wan_vm 1000 "wan0" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK} ${SNIPPET_FILE}
 qm set 1000 --net0 virtio,bridge=vmbr00 --ipconfig0 ip=dhcp
-qm set 1000 --net1 virtio,bridge=vmbr10 --ipconfig1 ip=127.0.10.1/24
-qm set 1000 --net2 virtio,bridge=admin --ipconfig2 ip=172.0.0.10/24
+qm set 1000 --net1 virtio,bridge=vmbr10 --ipconfig1 ip=172.0.10.1/24
+qm set 1000 --net2 virtio,bridge=admin --ipconfig2 ip=126.0.0.10/24
 qm set 1000 --nameserver "1.1.1.1 1.0.0.1"
 
 # VM 1001: wan1
 create_wan_vm 1001 "wan1" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK} ${SNIPPET_FILE}
 qm set 1001 --net0 virtio,bridge=vmbr01 --ipconfig0 ip=dhcp
-qm set 1001 --net1 virtio,bridge=vmbr11 --ipconfig1 ip=127.0.11.1/24
-qm set 1001 --net2 virtio,bridge=admin --ipconfig2 ip=172.0.0.11/24
+qm set 1001 --net1 virtio,bridge=vmbr11 --ipconfig1 ip=172.0.11.1/24
+qm set 1001 --net2 virtio,bridge=admin --ipconfig2 ip=126.0.0.11/24
 qm set 1001 --nameserver "1.1.1.1 1.0.0.1"
 
 # VM 1003: lan0
 create_vm 1003 "lan0" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
 qm set 1003 --net0 virtio,bridge=vmbr03 --ipconfig0 ip=dhcp
-qm set 1003 --net1 virtio,bridge=admin --ipconfig1 ip=172.0.0.13/24
+qm set 1003 --net1 virtio,bridge=admin --ipconfig1 ip=126.0.0.13/24
 
 # VM 1004: lan1
 create_vm 1004 "lan1" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
 qm set 1004 --net0 virtio,bridge=vmbr03 --ipconfig0 ip=dhcp
-qm set 1004 --net1 virtio,bridge=admin --ipconfig1 ip=172.0.0.14/24
+qm set 1004 --net1 virtio,bridge=admin --ipconfig1 ip=126.0.0.14/24
 
 # VM 1005: lan2 (Assuming name lan2 as lan1 is duplicated)
 create_vm 1005 "lan2" ${COMMON_CORES} ${COMMON_MEMORY} ${COMMON_DISK}
 qm set 1005 --net0 virtio,bridge=vmbr03 --ipconfig0 ip=dhcp
-qm set 1005 --net1 virtio,bridge=admin --ipconfig1 ip=172.0.0.15/24
+qm set 1005 --net1 virtio,bridge=admin --ipconfig1 ip=126.0.0.15/24
 
 
 # --- VM Group 2 (8 CPU, 8GB RAM, 32GB Disk) ---
 
 # VM 1002
 create_vm 1002 "router" 8 8192 "32G"
-qm set 1002 --net0 virtio,bridge=vmbr10 --ipconfig0 ip=127.0.10.10/24,gw=127.0.10.1
-qm set 1002 --net1 virtio,bridge=vmbr11 --ipconfig1 ip=127.0.11.10/24,gw=127.0.11.1
-qm set 1002 --net2 virtio,bridge=vmbr02 --ipconfig2 ip=127.0.12.10/24
-qm set 1002 --net3 virtio,bridge=admin --ipconfig3 ip=172.0.0.12/24
+qm set 1002 --net0 virtio,bridge=vmbr10 --ipconfig0 ip=172.0.10.10/24,gw=172.0.10.1
+qm set 1002 --net1 virtio,bridge=vmbr11 --ipconfig1 ip=172.0.11.10/24,gw=172.0.11.1
+qm set 1002 --net2 virtio,bridge=vmbr02 --ipconfig2 ip=10.40.0.1/20
+qm set 1002 --net3 virtio,bridge=admin --ipconfig3 ip=126.0.0.12/24
 qm set 1002 --nameserver "1.1.1.1 1.0.0.1"
 
 
@@ -313,14 +313,14 @@ echo "  - IP forwarding and NAT are enabled automatically via cloud-init"
 echo "  - VMs will reboot after initial setup to apply all settings"
 echo ""
 echo "=== Admin Bridge Configuration ==="
-echo "All VMs are connected to the 'admin' bridge (172.0.0.0/24) for SSH access from Proxmox:"
-echo "  - wan0:   172.0.0.10"
-echo "  - wan1:   172.0.0.11"
-echo "  - router: 172.0.0.12"
-echo "  - lan0:   172.0.0.13"
-echo "  - lan1:   172.0.0.14"
-echo "  - lan2:   172.0.0.15"
-echo "  - Proxmox: 172.0.0.1"
+echo "All VMs are connected to the 'admin' bridge (126.0.0.0/24) for SSH access from Proxmox:"
+echo "  - wan0:   126.0.0.10"
+echo "  - wan1:   126.0.0.11"
+echo "  - router: 126.0.0.12"
+echo "  - lan0:   126.0.0.13"
+echo "  - lan1:   126.0.0.14"
+echo "  - lan2:   126.0.0.15"
+echo "  - Proxmox: 126.0.0.1"
 echo ""
 
 read -p "Do you want to start all created VMs now? (y/N) " -n 1 -r
